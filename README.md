@@ -3,24 +3,24 @@
 This program is a skeleton to be further enhanced for your purpose!
 
 First define the type of board you are using by removeing the two slashes in front:
-<code>
+<pre>
 //======= define type of board ===========
 //==== only define one (1) board type ====
 // #define _IS_ARDUINO
 // #define _IS_ESP8266
 // #define _IS_ESP32
-</code>
+</pre>
 
 Define the IP address of your DSMR-logger:
-<code>
+<pre>
 #define _DSMR_IP_ADDRESS    "IP_ADDRESS_OF_YOUR_DSMR_LOGGER"
-</code>
+</pre>
 
 If your board has WiFi then enter the WiFi credentials:
-<code>
+<pre>
 #define _WIFI_SSID          "YOUR_WIFI_SSID"
 #define _WIFI_PASSWRD       "YOUR_WIFI_PASSWRD"
-</code>
+</pre>
 
 Be aware that the program stretches the (memory) limits of the Arduino (UNI or Ethernet) board(s)!
 
