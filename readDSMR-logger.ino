@@ -5,7 +5,7 @@
 **  This program call's the DSMR-logger "actual" restAPI
 **  and presents the value of the fields.
 */
-#define _FW_VERSION "v2.0.1 (15-09-2020)"
+#define _FW_VERSION "v2.0 (17-09-2020)"
 /*
 **  Copyright (c) 2020 Willem Aandewiel
 **
@@ -15,16 +15,17 @@
 
 //======= define type of board ===========
 //==== only define one (1) board type ====
-// #define _IS_ARDUINO_UNO  
 #define _IS_ARDUINO_MEGA
 // #define _IS_ESP8266 
 // #define _IS_ESP32     
 //========================================
+
+//==== edit setup.h ======================
+#include "setup.h"
 //======= leave the rest unchanged =======
 
-#include "setup.h"
 
-#if defined( _IS_ARDUINO_UNO ) || defined( _IS_ARDUINO_MEGA )
+#ifdef _IS_ARDUINO_MEGA 
   #include <ArduinoHttpClient.h>    // tested with version 0.4.0
   #include <Ethernet.h>
   #include <SPI.h>
@@ -56,7 +57,13 @@ String      payload;
 int         httpResponseCode;
 uint32_t    lastRead = 0;
 
-#if defined( _IS_ARDUINO_UNO ) || defined( _IS_ARDUINO_MEGA )
+//--- catch specific fields for further processing -------
+//--- these are just an example! see readDsmrLogger() ----
+String  timeStamp;
+int     voltageL1, currentL1;
+float   pwrDelivered, pwrReturned;
+
+#ifdef _IS_ARDUINO_MEGA 
 //--------------------------------------------------------------------------
 // Include in the main program:
 //    #include <ArduinoHttpClient.h>    // version 0.4.0
@@ -95,10 +102,8 @@ bool dsmrGETrequest()
   }
 
   payload    = DSMRclient.responseBody();
-#ifndef _IS_ARDUINO_UNO
-  Serial.print("Response: ");
-  Serial.println(payload);
-#endif
+  //--debug-Serial.print(F("payload: "));
+  //--debugSerial.println(payload);
   
   // Free resources
   DSMRclient.stop();
@@ -124,6 +129,7 @@ bool dsmrGETrequest()
   if (!DSMRclient.connect(DSMRserverIP, 80))
   {
     Serial.println(F("error connecting to DSMRlogger "));
+    payload = "{\"actual\":[{\"name\":\"httpresponse\", \"value\":\"error connecting\"}]}";
     return false;
   }
 
@@ -138,9 +144,9 @@ bool dsmrGETrequest()
 
   DSMRclient.setTimeout(2000);
 
-  //-debug-Serial.println("find(HTTP/1.1)..");
+  //--debug-Serial.println("find(HTTP/1.1)..");
   DSMRclient.find("HTTP/1.1");  // skip everything up-until "HTTP/1.1"
-  //-debug-Serial.print("DSMRclient.parseInt() ==> ");
+  //--debug-Serial.print("DSMRclient.parseInt() ==> ");
   httpResponseCode = DSMRclient.parseInt(); // parse status code
   
   Serial.print("HTTP Response code: ");
@@ -170,12 +176,12 @@ bool dsmrGETrequest()
       if (   (line[0] == '{') || (line[0] == ',') 
           || (line[0] == '[') || (line[0] == ']') )
       {
-        //-debug-Serial.print(line);
+        //--debug-Serial.print(line);
         payload += line;
       }
     }
   }
-  //-debug-Serial.println();
+  //--debug-Serial.println();
   
   // Free resources
   DSMRclient.stop();
@@ -290,11 +296,7 @@ void readDsmrLogger()
   topLevelData.replace("[", "");
   topLevelData.replace("]", "");
 
-#ifdef _IS_ARDUINO_UNO
-  Serial.println(F("== Parsed Data =="));
-#else
   Serial.println(F("== Parsed Data ===================================="));
-#endif
 
   bool doParsing = true;
   int  fieldNr   = 0;
@@ -305,29 +307,33 @@ void readDsmrLogger()
     fieldNr++;
     if (field.length() > 0)
     {
-      //-debug-Serial.println(field);
+      //--debug-Serial.println(field);
       JSONVar nextObject = JSON.parse(field);
       JSONVar dataArray = nextObject.keys();
-      for (int i = 0; i < dataArray.length(); i++) 
+
+      //---- List all fields and values ------
+      JSONVar jName   = nextObject[dataArray[0]]; // field Name
+      String  sName   = removeQuotes(jName);      // field Name as a String
+      JSONVar jValue  = nextObject[dataArray[1]]; // field Value
+      String  sValue  = removeQuotes(jValue);     // field Value as a String
+      String  sUnit = "";
+      if (dataArray.length() == 3)
       {
-        JSONVar value = nextObject[dataArray[i]];
-        if (removeQuotes(dataArray[i]) == "name")
-        {
-          Serial.print(removeQuotes(value));
-          Serial.print(F(" = "));
-        }
-        if (removeQuotes(dataArray[i]) == "value")
-        {
-          Serial.print(removeQuotes(value));
-        }
-        if (removeQuotes(dataArray[i]) == "unit")
-        {
-          Serial.print(F(" ("));
-          Serial.print(removeQuotes(value));
-          Serial.print(F(")"));
-        }
-        if (i == dataArray.length() -1)  Serial.println();
+        JSONVar jUnit = nextObject[dataArray[2]]; // field Unit
+        sUnit = removeQuotes(jUnit);              // field Unit as a String
       }
+      Serial.print(sName);  Serial.print("\t");
+      Serial.print(sValue); Serial.print(" ");
+      Serial.print(sUnit);
+      Serial.println();
+      //--- now catch some fields of interrest for further 
+      //--- processing
+      //--- you need to declare the capture fields global
+      if (sName == "timestamp")       timeStamp    = sValue;
+      if (sName == "voltage_l1")      voltageL1    = sValue.toInt();
+      if (sName == "current_l1")      currentL1    = sValue.toInt();
+      if (sName == "power_delivered") pwrDelivered = sValue.toFloat();
+      if (sName == "power_returned")  pwrReturned  = sValue.toFloat();
     }
     else  // zero length, end of string
     {
@@ -335,12 +341,8 @@ void readDsmrLogger()
     }
   } // loop over all data
 
-#ifdef _IS_ARDUINO_UNO
-  Serial.println(F("================="));
-#else
   Serial.println(F("=================================================="));
   Serial.print(F("Parsed [")); Serial.print(fieldNr-1); Serial.println(F("] fields"));
-#endif
       
 } // readDsmrLogger()
 
@@ -351,11 +353,9 @@ void setup()
   Serial.begin(115200);
   while(!Serial) { /* wait a bit */ }
 
-#ifndef _IS_ARDUINO_UNO 
   Serial.println(F("And then it all begins ..."));
-#endif
 
-#ifdef _IS_ARDUINO_UNO
+#ifdef _IS_ARDUINO_MEGA
   // Initialize Ethernet library
   byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 
@@ -369,21 +369,19 @@ void setup()
 
 #if defined(_IS_ESP8266) || defined(_IS_ESP32)
   WiFi.begin(ssid, password);
-  Serial.println("Connecting");
+  Serial.println(F("Connecting"));
   while(WiFi.status() != WL_CONNECTED) {
     delay(500);
     Serial.print(".");
   }
   Serial.println("");
-  Serial.print("Connected to WiFi network with IP Address: ");
+  Serial.print(F("Connected to WiFi network with IP Address: "));
   Serial.println(WiFi.localIP());
 #endif
 
   lastRead = millis() + _READINTERVAL;
 
-#ifndef _IS_ARDUINO_UNO 
   Serial.println(F("\r\nStart reading ..."));
-#endif
 
 } // setup()
 
@@ -394,10 +392,14 @@ void loop()
   if ((millis() - lastRead) > _READINTERVAL)
   {
     lastRead = millis();
-    #ifndef _IS_ARDUINO_UNO 
-      Serial.println(F("\r\nread API from DSMR-logger..."));
-    #endif
+    Serial.println(F("\r\nread API from DSMR-logger..."));
     readDsmrLogger();
+    Serial.println(F("\r\nCaptured fields .."));
+    Serial.print(F("timestamp    : \t")); Serial.println(timeStamp);
+    Serial.print(F("voltage      : \t")); Serial.println(voltageL1);
+    Serial.print(F("current      : \t")); Serial.println(currentL1);
+    Serial.print(F("pwrDelivered : \t")); Serial.println(pwrDelivered);
+    Serial.print(F("pwrReturned  : \t")); Serial.println(pwrReturned);
   }
   
 } // loop()

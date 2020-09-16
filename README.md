@@ -6,7 +6,6 @@ First define the type of board you are using by removeing the two slashes in fro
 <pre>
 //======= define type of board ===========
 //==== only define one (1) board type ====
-// #define _IS_ARDUINO_UNI
 // #define _IS_ARDUINO_MEGA
 // #define _IS_ESP8266
 // #define _IS_ESP32
@@ -24,7 +23,7 @@ If your board has WiFi then enter the WiFi credentials:
 #define _WIFI_PASSWRD       "YOUR_WIFI_PASSWRD"
 </pre>
 
-Be aware that the program stretches the (memory) limits of the Arduino (UNI or Ethernet) board(s)!
+Be aware that the program stretches the (memory) limits of the Arduino UNO or Ethernet) board(s)!
 
 For more information on the DSMR-logger 
 <a href="https://willem.aandewiel.nl/index.php/2020/02/28/restapis-zijn-hip-nieuwe-firmware-voor-de-dsmr-logger/">see</a>
