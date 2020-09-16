@@ -15,17 +15,16 @@
 
 //======= define type of board ===========
 //==== only define one (1) board type ====
-#define _IS_ARDUINO  
+// #define _IS_ARDUINO_UNO  
+#define _IS_ARDUINO_MEGA
 // #define _IS_ESP8266 
 // #define _IS_ESP32     
-//
-#define _DSMR_IP_ADDRESS    "IP_ADDRESS_OF_YOUR_DSMR_LOGGER"
-#define _WIFI_SSID          "YOUR_WIFI_SSID"
-#define _WIFI_PASSWRD       "YOUR_WIFI_PASSWRD"
+//========================================
 //======= leave the rest unchanged =======
 
+#include "setup.h"
 
-#ifdef _IS_ARDUINO
+#if defined( _IS_ARDUINO_UNO ) || defined( _IS_ARDUINO_MEGA )
   #include <ArduinoHttpClient.h>    // tested with version 0.4.0
   #include <Ethernet.h>
   #include <SPI.h>
@@ -57,7 +56,7 @@ String      payload;
 int         httpResponseCode;
 uint32_t    lastRead = 0;
 
-#ifdef _IS_ARDUINO
+#if defined( _IS_ARDUINO_UNO ) || defined( _IS_ARDUINO_MEGA )
 //--------------------------------------------------------------------------
 // Include in the main program:
 //    #include <ArduinoHttpClient.h>    // version 0.4.0
@@ -96,8 +95,10 @@ bool dsmrGETrequest()
   }
 
   payload    = DSMRclient.responseBody();
-  //-debug-Serial.print("Response: ");
-  //-debug-Serial.println(payload);
+#ifndef _IS_ARDUINO_UNO
+  Serial.print("Response: ");
+  Serial.println(payload);
+#endif
   
   // Free resources
   DSMRclient.stop();
@@ -289,7 +290,7 @@ void readDsmrLogger()
   topLevelData.replace("[", "");
   topLevelData.replace("]", "");
 
-#ifdef _IS_ARDUINO
+#ifdef _IS_ARDUINO_UNO
   Serial.println(F("== Parsed Data =="));
 #else
   Serial.println(F("== Parsed Data ===================================="));
@@ -334,7 +335,7 @@ void readDsmrLogger()
     }
   } // loop over all data
 
-#ifdef _IS_ARDUINO
+#ifdef _IS_ARDUINO_UNO
   Serial.println(F("================="));
 #else
   Serial.println(F("=================================================="));
@@ -350,11 +351,11 @@ void setup()
   Serial.begin(115200);
   while(!Serial) { /* wait a bit */ }
 
-#ifndef _IS_ARDUINO 
+#ifndef _IS_ARDUINO_UNO 
   Serial.println(F("And then it all begins ..."));
 #endif
 
-#ifdef _IS_ARDUINO
+#ifdef _IS_ARDUINO_UNO
   // Initialize Ethernet library
   byte mac[] = {0xDE, 0xAD, 0xBE, 0xEF, 0xFE, 0xED};
 
@@ -380,7 +381,7 @@ void setup()
 
   lastRead = millis() + _READINTERVAL;
 
-#ifndef _IS_ARDUINO 
+#ifndef _IS_ARDUINO_UNO 
   Serial.println(F("\r\nStart reading ..."));
 #endif
 
@@ -393,7 +394,7 @@ void loop()
   if ((millis() - lastRead) > _READINTERVAL)
   {
     lastRead = millis();
-    #ifndef _IS_ARDUINO 
+    #ifndef _IS_ARDUINO_UNO 
       Serial.println(F("\r\nread API from DSMR-logger..."));
     #endif
     readDsmrLogger();

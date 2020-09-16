@@ -6,11 +6,13 @@ First define the type of board you are using by removeing the two slashes in fro
 <pre>
 //======= define type of board ===========
 //==== only define one (1) board type ====
-// #define _IS_ARDUINO
+// #define _IS_ARDUINO_UNI
+// #define _IS_ARDUINO_MEGA
 // #define _IS_ESP8266
 // #define _IS_ESP32
 </pre>
 
+### In the tab "setup.h" 
 Define the IP address of your DSMR-logger:
 <pre>
 #define _DSMR_IP_ADDRESS    "IP_ADDRESS_OF_YOUR_DSMR_LOGGER"
