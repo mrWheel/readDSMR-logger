@@ -15,7 +15,7 @@
 
 //======= define type of board ===========
 //==== only define one (1) board type ====
-#define _IS_ARDUINO_MEGA
+// #define _IS_ARDUINO_MEGA
 // #define _IS_ESP8266 
 // #define _IS_ESP32     
 //========================================
@@ -256,13 +256,13 @@ String splitJsonArray(String data, int index)
 
 
 //--------------------------------------------------------------------------
-String removeQuotes(JSONVar in)
+String JSONVar2String(JSONVar in)
 {
   String in2 = JSON.stringify(in);
   in2.replace("\"", "");
   return in2;
     
-} // removeQuotes()
+} // JSONVar2String()
 
 
 //--------------------------------------------------------------------------
@@ -311,24 +311,22 @@ void readDsmrLogger()
       JSONVar nextObject = JSON.parse(field);
       JSONVar dataArray = nextObject.keys();
 
-      //---- List all fields and values ------
-      JSONVar jName   = nextObject[dataArray[0]]; // field Name
-      String  sName   = removeQuotes(jName);      // field Name as a String
-      JSONVar jValue  = nextObject[dataArray[1]]; // field Value
-      String  sValue  = removeQuotes(jValue);     // field Value as a String
-      String  sUnit = "";
+      //---- parse all fields and values ------
+      String  sName   = JSONVar2String(nextObject[dataArray[0]]); // field Name as a String
+      String  sValue  = JSONVar2String(nextObject[dataArray[1]]); // field Value as a String
+      String  sUnit   = "";
       if (dataArray.length() == 3)
       {
-        JSONVar jUnit = nextObject[dataArray[2]]; // field Unit
-        sUnit = removeQuotes(jUnit);              // field Unit as a String
+        sUnit = JSONVar2String(nextObject[dataArray[2]]); // field Unit as a String
       }
+      //---- list all fields and values ----
       Serial.print(sName);  Serial.print("\t");
       Serial.print(sValue); Serial.print(" ");
       Serial.print(sUnit);
       Serial.println();
       //--- now catch some fields of interrest for further 
       //--- processing
-      //--- you need to declare the capture fields global
+      //--- you need to declare the fields to be captured global
       if (sName == "timestamp")       timeStamp    = sValue;
       if (sName == "voltage_l1")      voltageL1    = sValue.toInt();
       if (sName == "current_l1")      currentL1    = sValue.toInt();
