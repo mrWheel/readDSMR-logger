@@ -5,7 +5,7 @@
 **  This program call's the DSMR-logger "actual" restAPI
 **  and presents the value of the fields.
 */
-#define _FW_VERSION "v2.0 (17-09-2020)"
+#define _FW_VERSION "v2.0 (20-09-2020)"
 /*
 **  Copyright (c) 2020 Willem Aandewiel
 **
@@ -24,6 +24,9 @@
 #include "setup.h"
 //======= leave the rest unchanged =======
 
+#if !defined(_IS_ARDUINO_MEGA) && !defined(_IS_ESP8266) && !defined(_IS_ESP32)
+  #error Select one (and only one) board -- abort
+#endif
 
 #ifdef _IS_ARDUINO_MEGA 
   #include <ArduinoHttpClient.h>    // tested with version 0.4.0
@@ -48,7 +51,7 @@
 
 #include <Arduino_JSON.h>   // install with Library Manager
 
-#define _READINTERVAL 60000
+#define _READINTERVAL     60000
 
 const char *DSMRprotocol  = "http://";
 const char *DSMRserverIP  = _DSMR_IP_ADDRESS;
@@ -86,7 +89,7 @@ bool dsmrGETrequest()
   EthernetClient ETHclient;
   HttpClient DSMRclient = HttpClient(ETHclient, DSMRserverIP, 80);
 
-  payload = "{}"; 
+  payload = ""; 
    
   Serial.println(F("making GET request"));
   DSMRclient.get(DSMRrestAPI);
@@ -103,7 +106,7 @@ bool dsmrGETrequest()
 
   payload    = DSMRclient.responseBody();
   //--debug-Serial.print(F("payload: "));
-  //--debugSerial.println(payload);
+  //--debug-Serial.println(payload);
   
   // Free resources
   DSMRclient.stop();
@@ -142,7 +145,7 @@ bool dsmrGETrequest()
   DSMRclient.println(F("Connection: close"));
   DSMRclient.println();
 
-  DSMRclient.setTimeout(2000);
+  DSMRclient.setTimeout(1000);
 
   //--debug-Serial.println("find(HTTP/1.1)..");
   DSMRclient.find("HTTP/1.1");  // skip everything up-until "HTTP/1.1"
@@ -210,7 +213,7 @@ bool dsmrGETrequest()
   Serial.print("HTTP Response code: ");
   Serial.println(httpResponseCode);
   
-  payload = "{}"; 
+  payload = ""; 
   
   if (httpResponseCode > 0) 
   {
@@ -232,52 +235,17 @@ bool dsmrGETrequest()
 } // dsmrGETrequest()
 #endif
 
-//--------------------------------------------------------------------------
-String splitJsonArray(String data, int index)
-{
-  int found = 0;
-  int strIndex[] = {0, -1};
-  int maxIndex = data.length()-1;
-
-  for(int i=0; i<=maxIndex && found<=index; i++)
-  {
-    if((data.charAt(i) == '}' && data.charAt(i+1) == ',') || i==maxIndex)
-    {
-        found++;
-        strIndex[0] = strIndex[1]+1;
-        strIndex[1] = (i == maxIndex) ? i+1 : i;
-        if (data.charAt(i+1) == ',') data[i+1] = ' ';
-    }
-  }
-
-  return found>index ? data.substring(strIndex[0], strIndex[1]+1) : "";
-  
-} // splitJsonArray()
-
-
-//--------------------------------------------------------------------------
-String JSONVar2String(JSONVar in)
-{
-  String in2 = JSON.stringify(in);
-  in2.replace("\"", "");
-  return in2;
-    
-} // JSONVar2String()
-
 
 //--------------------------------------------------------------------------
 void readDsmrLogger()
 {
+  int fieldNr = 0;
+
   dsmrGETrequest();
 
-  JSONVar myObject = JSON.parse(payload);
-  
-  // JSON.typeof(jsonVar) can be used to get the type of the var
-  if (JSON.typeof(myObject) == "undefined") 
-  {
-    Serial.println(F("Parsing failed!"));
-    return;
-  }
+  Serial.println();
+  Serial.println(F("==== Start parsing payload ======================="));
+    
   // This is how the "actual" JSON object looks like:
   //   {"actual":[
   //       {"name":"timestamp","value":"200911140716S"}
@@ -292,55 +260,53 @@ void readDsmrLogger()
   //      ,{"name":"power_returned_l3","value":0.722,"unit":"kW"}
   //      ,{"name":"gas_delivered","value":2915.08,"unit":"m3"}
   //    ]}
-  String topLevelData = JSON.stringify(myObject["actual"]);
-  topLevelData.replace("[", "");
-  topLevelData.replace("]", "");
 
-  Serial.println(F("== Parsed Data ===================================="));
+  //--debug-Serial.print(F("payload: "));
+  //--debug-Serial.println(payload);
 
-  bool doParsing = true;
-  int  fieldNr   = 0;
-  while(doParsing)
+  JSONVar dsmrJsonObject = JSON.parse(payload);
+  
+  // JSON.typeof(jsonVar) can be used to get the type of the var
+  if (JSON.typeof(dsmrJsonObject) == "undefined") 
   {
-    yield();
-    String field = splitJsonArray(topLevelData, fieldNr);
-    fieldNr++;
-    if (field.length() > 0)
-    {
-      //--debug-Serial.println(field);
-      JSONVar nextObject = JSON.parse(field);
-      JSONVar dataArray = nextObject.keys();
+    Serial.println(F("Parsing failed!"));
+    return;
+  }
+  //--debug-Serial.print("JSON.typeof(dsmrJsonObject) = ");
+  //--debug-Serial.println(JSON.typeof(dsmrJsonObject)); // prints: array
 
-      //---- parse all fields and values ------
-      String  sName   = JSONVar2String(nextObject[dataArray[0]]); // field Name as a String
-      String  sValue  = JSONVar2String(nextObject[dataArray[1]]); // field Value as a String
-      String  sUnit   = "";
-      if (dataArray.length() == 3)
-      {
-        sUnit = JSONVar2String(nextObject[dataArray[2]]); // field Unit as a String
-      }
-      //---- list all fields and values ----
-      Serial.print(sName);  Serial.print("\t");
-      Serial.print(sValue); Serial.print(" ");
-      Serial.print(sUnit);
-      Serial.println();
-      //--- now catch some fields of interrest for further 
-      //--- processing
-      //--- you need to declare the fields to be captured global
-      if (sName == "timestamp")       timeStamp    = sValue;
-      if (sName == "voltage_l1")      voltageL1    = sValue.toInt();
-      if (sName == "current_l1")      currentL1    = sValue.toInt();
-      if (sName == "power_delivered") pwrDelivered = sValue.toFloat();
-      if (sName == "power_returned")  pwrReturned  = sValue.toFloat();
-    }
-    else  // zero length, end of string
-    {
-      doParsing = false;
-    }
-  } // loop over all data
+  JSONVar dsmrJsonField = dsmrJsonObject["actual"];
+
+  // dsmrJsonField.length() can be used to get the length of the array
+  //--debug-Serial.print("dsmrJsonField.length() = ");
+  //--debug-Serial.println(dsmrJsonField.length());
+  //--debug-Serial.println();
+  
+  for (int i = 0; i < dsmrJsonField.length(); i++)
+  {
+    fieldNr++;
+    //--debug-Serial.print(dsmrJsonField[i]);
+    String sName  = (const char *)dsmrJsonField[i]["name"];
+    String sValue = (const char *)dsmrJsonField[i]["value"];
+    if (sValue == "") sValue = String((double)dsmrJsonField[i]["value"]);
+    String sUnit  = (const char *)dsmrJsonField[i]["unit"];
+    //---- list all fields and values ----
+    Serial.print(sName);  Serial.print(" \t");
+    Serial.print(sValue); Serial.print(" ");
+    Serial.print(sUnit);
+    Serial.println();
+    //--- now catch some fields of interrest for further 
+    //--- processing
+    //--- you need to declare the fields to be captured global
+    if (sName == "timestamp")       timeStamp    = sValue;
+    if (sName == "voltage_l1")      voltageL1    = sValue.toInt();
+    if (sName == "current_l1")      currentL1    = sValue.toInt();
+    if (sName == "power_delivered") pwrDelivered = sValue.toFloat();
+    if (sName == "power_returned")  pwrReturned  = sValue.toFloat();
+  }
 
   Serial.println(F("=================================================="));
-  Serial.print(F("Parsed [")); Serial.print(fieldNr-1); Serial.println(F("] fields"));
+  Serial.print(F("Parsed [")); Serial.print(fieldNr); Serial.println(F("] fields"));
       
 } // readDsmrLogger()
 
@@ -351,6 +317,7 @@ void setup()
   Serial.begin(115200);
   while(!Serial) { /* wait a bit */ }
 
+  Serial.println("");
   Serial.println(F("And then it all begins ..."));
 
 #ifdef _IS_ARDUINO_MEGA
@@ -394,8 +361,8 @@ void loop()
     readDsmrLogger();
     Serial.println(F("\r\nCaptured fields .."));
     Serial.print(F("timestamp    : \t")); Serial.println(timeStamp);
-    Serial.print(F("voltage      : \t")); Serial.println(voltageL1);
-    Serial.print(F("current      : \t")); Serial.println(currentL1);
+    Serial.print(F("voltage L1   : \t")); Serial.println(voltageL1);
+    Serial.print(F("current L1   : \t")); Serial.println(currentL1);
     Serial.print(F("pwrDelivered : \t")); Serial.println(pwrDelivered);
     Serial.print(F("pwrReturned  : \t")); Serial.println(pwrReturned);
   }
